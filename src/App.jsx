@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 
 // --- Assets ---
 // Make sure to place your image files in the 'src/assets' folder of your project.
-import weddingPhoto from './assets/irzumramin.jpg'; // This is the new image for the right column
+import weddingLogo from './assets/irzumramin.png';
+import weddingPhoto from './assets/wedding-photo.png'; // This is the new image for the right column
 
 // --- Configuration ---
 // The configuration is now loaded from a .env.local file in your project's root directory.
@@ -17,6 +18,7 @@ import weddingPhoto from './assets/irzumramin.jpg'; // This is the new image for
 // VITE_FOLDER_ID_MEHDI=YOUR_FOLDER_ID_FOR_MEHDI
 // VITE_FOLDER_ID_BARAAT=YOUR_FOLDER_ID_FOR_BARAAT
 // VITE_FOLDER_ID_VALIMA=YOUR_FOLDER_ID_FOR_VALIMA
+// VITE_FOLDER_ID_RAMINBDAY=YOUR_FOLDER_ID_FOR_RAMIN_BIRTHDAY
 //
 // After creating or updating the .env.local file, you MUST restart your development server.
 
@@ -32,7 +34,7 @@ const GOOGLE_DRIVE_FOLDER_IDS = {
   'Nikkah': import.meta.env.VITE_FOLDER_ID_NIKKAH,
   'Ramin Mayun': import.meta.env.VITE_FOLDER_ID_MAYUN_RAMIN,
   'Irzum Mayun': import.meta.env.VITE_FOLDER_ID_MAYUN_IRZUM,
-  'Mehndi': import.meta.env.VITE_FOLDER_ID_MEHNDI,
+  'Mehndi': import.meta.env.VITE_FOLDER_ID_MEHDI,
   'Baraat': import.meta.env.VITE_FOLDER_ID_BARAAT,
   'Ramin Birthday': import.meta.env.VITE_FOLDER_ID_RAMINBDAY,
   'Valima': import.meta.env.VITE_FOLDER_ID_VALIMA,
@@ -175,6 +177,26 @@ export default function App() {
     }
   };
 
+  /**
+   * Resets the uploader state to allow for a new batch of files.
+   */
+  const resetUploader = () => {
+      setFiles([]);
+      setUploadProgress({});
+      setTotalProgress(0);
+      setCurrentFileIndex(0);
+      setError(null);
+      // This ensures the user can re-select the same file(s) if they wish.
+      if(fileInputRef.current) {
+          fileInputRef.current.value = "";
+      }
+  };
+
+  // --- UPLOAD LOGIC REFACTORED FOR MEMORY EFFICIENCY ---
+  
+  /**
+   * Kicks off the upload process.
+   */
   const handleUpload = async () => {
     if (files.length === 0) {
       setError("Please select files to upload first.");
@@ -188,49 +210,77 @@ export default function App() {
     setIsUploading(true);
     setError(null);
     window.gapi.client.setToken({ access_token: accessToken });
+    
+    // Start uploading the first file in the sequence.
+    uploadFileAtIndex(0);
+  };
 
+  /**
+   * Uploads a single file by its index and then calls itself for the next file.
+   * This ensures files are uploaded one by one, preventing memory crashes.
+   * @param {number} fileIndex The index of the file to upload from the `files` array.
+   */
+  const uploadFileAtIndex = (fileIndex) => {
+    // If we've uploaded all files, we're done.
+    if (fileIndex >= files.length) {
+      // Note: We don't set isUploading to false here. It's handled by the useEffect.
+      // This allows the "Upload Complete" message to show correctly.
+      if (window.gapi && window.gapi.client) {
+        window.gapi.client.setToken(null); // Clear token
+      }
+      return;
+    }
+
+    setCurrentFileIndex(fileIndex);
+    const file = files[fileIndex];
     const folderId = GOOGLE_DRIVE_FOLDER_IDS[category];
+
     if (!folderId) {
       setError(`Folder ID for category "${category}" is not configured.`);
       setIsUploading(false);
       return;
     }
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      setCurrentFileIndex(i);
-      const metadata = { name: file.name, parents: [folderId] };
-      const reader = new FileReader();
-      reader.readAsBinaryString(file);
-      reader.onload = async () => {
-        const boundary = '-------314159265358979323846';
-        const delimiter = `\r\n--${boundary}\r\n`;
-        const close_delim = `\r\n--${boundary}--`;
-        const contentType = file.type || 'application/octet-stream';
-        const base64Data = btoa(reader.result);
-        const multipartRequestBody =
-          delimiter + `Content-Type: application/json\r\n\r\n` + JSON.stringify(metadata) +
-          delimiter + `Content-Type: ${contentType}\r\n` + `Content-Transfer-Encoding: base64\r\n\r\n` +
-          base64Data + close_delim;
+    const metadata = { name: file.name, parents: [folderId] };
+    const reader = new FileReader();
+    reader.readAsBinaryString(file);
 
-        try {
-          await window.gapi.client.request({
-            path: 'https://www.googleapis.com/upload/drive/v3/files',
-            method: 'POST',
-            params: { uploadType: 'multipart' },
-            headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
-            body: multipartRequestBody,
-          });
-          setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
-        } catch (err) {
-          console.error("Upload error for file:", file.name, err);
-          setError(`Error uploading ${file.name}: ${err.result?.error?.message || 'Unknown error'}`);
-          setIsUploading(false);
-          window.gapi.client.setToken(null);
-          return;
-        }
-      };
-    }
+    reader.onload = async () => {
+      const boundary = '-------314159265358979323846';
+      const delimiter = `\r\n--${boundary}\r\n`;
+      const close_delim = `\r\n--${boundary}--`;
+      const contentType = file.type || 'application/octet-stream';
+      const base64Data = btoa(reader.result);
+      const multipartRequestBody =
+        delimiter + `Content-Type: application/json\r\n\r\n` + JSON.stringify(metadata) +
+        delimiter + `Content-Type: ${contentType}\r\n` + `Content-Transfer-Encoding: base64\r\n\r\n` +
+        base64Data + close_delim;
+
+      try {
+        await window.gapi.client.request({
+          path: 'https://www.googleapis.com/upload/drive/v3/files',
+          method: 'POST',
+          params: { uploadType: 'multipart' },
+          headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
+          body: multipartRequestBody,
+        });
+        
+        // Update progress for this file and then upload the next one.
+        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+        uploadFileAtIndex(fileIndex + 1);
+
+      } catch (err) {
+        console.error("Upload error for file:", file.name, err);
+        setError(`Error uploading ${file.name}: ${err.result?.error?.message || 'Unknown error'}`);
+        setIsUploading(false);
+        window.gapi.client.setToken(null); // Clear token on error
+      }
+    };
+
+    reader.onerror = () => {
+        setError(`Could not read file: ${file.name}`);
+        setIsUploading(false);
+    };
   };
 
   // --- Effects ---
@@ -243,12 +293,10 @@ export default function App() {
     const completedFiles = Object.values(uploadProgress).filter(p => p === 100).length;
     setTotalProgress((completedFiles / files.length) * 100);
 
-    if (completedFiles === files.length) {
-      setIsUploading(false);
-      if (window.gapi && window.gapi.client) {
-        window.gapi.client.setToken(null);
-      }
+    if (completedFiles === files.length && files.length > 0) {
+        setIsUploading(false);
     }
+
   }, [uploadProgress, files]);
 
   // --- Render ---
@@ -263,7 +311,7 @@ export default function App() {
         {/* Left Column: Information & Controls */}
         <div className={`p-8 lg:p-12 bg-indigo-50 flex flex-col transition-all duration-500 ${allFilesUploaded ? 'justify-center' : ''}`}>
           <div className="flex-grow">
-            <h2 className="text-2xl md:text-3xl font-bold text-indigo-500 mb-4">Wedding Album</h2>
+            <img src={weddingLogo} alt="Ramin & Irzum Wedding Album" className="w-full max-w-[250px] mx-auto md:mx-0 mb-6" />
             <p className="text-slate-600 mt-4 leading-relaxed">
               Welcome! Please help us capture all the beautiful moments from our wedding events. 
               Sign in with your Google account, choose an event, and upload your photos.
@@ -320,22 +368,26 @@ export default function App() {
 
           {isSignedIn && (
             <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">2. Select Your Pictures</label>
-                <input type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} ref={fileInputRef} className="hidden"/>
-                <button onClick={triggerFileSelect} disabled={isUploading} className="w-full flex justify-center items-center p-6 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:bg-slate-50 hover:border-indigo-500 transition disabled:bg-slate-200 disabled:cursor-not-allowed">
-                  <svg className="w-8 h-8 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                  <span>{files.length > 0 ? `${files.length} file(s) selected` : 'Click to choose files'}</span>
-                </button>
-              </div>
-              
-              <div className="pt-2">
-                <button onClick={handleUpload} disabled={isUploading || files.length === 0} className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:bg-slate-400 disabled:cursor-not-allowed transition-transform transform active:scale-95">
-                  {isUploading ? `Uploading ${currentFileIndex + 1} of ${files.length}...` : 'Upload to Album'}
-                </button>
-              </div>
+              {!allFilesUploaded && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">2. Select Your Pictures</label>
+                    <input type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} ref={fileInputRef} className="hidden"/>
+                    <button onClick={triggerFileSelect} disabled={isUploading} className="w-full flex justify-center items-center p-6 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:bg-slate-50 hover:border-indigo-500 transition disabled:bg-slate-200 disabled:cursor-not-allowed">
+                      <svg className="w-8 h-8 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                      <span>{files.length > 0 ? `${files.length} file(s) selected` : 'Click to choose files'}</span>
+                    </button>
+                  </div>
+                  
+                  <div className="pt-2">
+                    <button onClick={handleUpload} disabled={isUploading || files.length === 0} className="w-full bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:bg-slate-400 disabled:cursor-not-allowed transition-transform transform active:scale-95">
+                      {isUploading ? `Uploading ${currentFileIndex + 1} of ${files.length}...` : 'Upload to Album'}
+                    </button>
+                  </div>
+                </>
+              )}
 
-              {(isUploading || allFilesUploaded) && (
+              {isUploading && (
                 <div className="space-y-4 pt-4">
                   <div>
                     <div className="flex justify-between items-center mb-1">
@@ -357,12 +409,20 @@ export default function App() {
                   </div>
                   <h2 className="text-2xl font-semibold text-emerald-800">Upload Complete!</h2>
                   <p className="text-emerald-700">Thank you for sharing your memories.</p>
-                  <button
-                      onClick={handleViewFolder}
-                      className="w-full bg-indigo-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform transform active:scale-95"
-                  >
-                      View Pictures
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <button
+                          onClick={handleViewFolder}
+                          className="w-full bg-indigo-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform transform active:scale-95"
+                      >
+                          View Pictures
+                      </button>
+                       <button
+                          onClick={resetUploader}
+                          className="w-full bg-slate-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-transform transform active:scale-95"
+                      >
+                          Upload More
+                      </button>
+                  </div>
                 </div>
               )}
             </div>
