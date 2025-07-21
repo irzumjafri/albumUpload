@@ -1,27 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 // --- Assets ---
-// Make sure to place your image files in the 'src/assets' folder of your project.
-import weddingLogo from './assets/irzumramin.png';
-import weddingPhoto from './assets/wedding-photo.png'; // This is the new image for the right column
+import weddingPhoto from './assets/irzumramin.jpg'; // This is the new image for the right column
 
-// --- Configuration ---
-// The configuration is now loaded from a .env.local file in your project's root directory.
-// Create a file named .env.local and add the following variables.
-// NOTE: For Vite projects, environment variables MUST start with the VITE_ prefix.
-//
-// VITE_GOOGLE_API_KEY=YOUR_API_KEY
-// VITE_GOOGLE_CLIENT_ID=YOUR_CLIENT_ID
-// VITE_FOLDER_ID_NIKKAH=YOUR_FOLDER_ID_FOR_NIKKAH
-// VITE_FOLDER_ID_MAYUN_RAMIN=YOUR_FOLDER_ID_FOR_RAMIN_MAYUN
-// VITE_FOLDER_ID_MAYUN_IRZUM=YOUR_FOLDER_ID_FOR_IRZUM_MAYUN
-// VITE_FOLDER_ID_MEHDI=YOUR_FOLDER_ID_FOR_MEHDI
-// VITE_FOLDER_ID_BARAAT=YOUR_FOLDER_ID_FOR_BARAAT
-// VITE_FOLDER_ID_VALIMA=YOUR_FOLDER_ID_FOR_VALIMA
-// VITE_FOLDER_ID_RAMINBDAY=YOUR_FOLDER_ID_FOR_RAMIN_BIRTHDAY
-//
-// After creating or updating the .env.local file, you MUST restart your development server.
-
+// --- Environment Variables ---
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -311,7 +293,7 @@ export default function App() {
         {/* Left Column: Information & Controls */}
         <div className={`p-8 lg:p-12 bg-indigo-50 flex flex-col transition-all duration-500 ${allFilesUploaded ? 'justify-center' : ''}`}>
           <div className="flex-grow">
-            <img src={weddingLogo} alt="Ramin & Irzum Wedding Album" className="w-full max-w-[250px] mx-auto md:mx-0 mb-6" />
+            <h2 className="text-2xl md:text-3xl font-bold text-indigo-500 mb-4">Wedding Album</h2>
             <p className="text-slate-600 mt-4 leading-relaxed">
               Welcome! Please help us capture all the beautiful moments from our wedding events. 
               Sign in with your Google account, choose an event, and upload your photos.
