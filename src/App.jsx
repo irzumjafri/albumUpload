@@ -34,6 +34,7 @@ const GOOGLE_DRIVE_FOLDER_IDS = {
   'Irzum Mayun': import.meta.env.VITE_FOLDER_ID_MAYUN_IRZUM,
   'Mehndi': import.meta.env.VITE_FOLDER_ID_MEHNDI,
   'Baraat': import.meta.env.VITE_FOLDER_ID_BARAAT,
+  'Ramin Birthday': import.meta.env.VITE_FOLDER_ID_RAMINBDAY,
   'Valima': import.meta.env.VITE_FOLDER_ID_VALIMA,
 };
 
